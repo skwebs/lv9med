@@ -16,10 +16,11 @@ class MedTypeController extends Controller
      */
     public function index()
     {
-        //
+        $medType = MedType::all();
         return response()->json([
             "success" => true,
-            "attributes" => MedType::all()
+            "attributes" => $medType,
+            "count" => $medType->count()
         ]);
     }
 
@@ -174,10 +175,11 @@ class MedTypeController extends Controller
 
     public function withTrashed()
     {
-        $res = MedType::withTrashed()->get();
+        $allData = MedType::withTrashed();
         return response()->json([
             "success" => true,
-            "trashed" => $res
+            "trashed" => $allData->get(),
+            "count" => $allData->count()
         ]);
     }
 

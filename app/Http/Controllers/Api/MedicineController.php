@@ -2,15 +2,12 @@
 
 namespace App\Http\Controllers\Api;
 
-use App\Models\Company;
+use App\Models\Medicine;
 use Illuminate\Http\Request;
 use App\Http\Controllers\Controller;
 use Illuminate\Support\Facades\Validator;
 
-
-use function GuzzleHttp\Promise\all;
-
-class CompanyController extends Controller
+class MedicineController extends Controller
 {
     /**
      * Display a listing of the resource.
@@ -19,10 +16,10 @@ class CompanyController extends Controller
      */
     public function index()
     {
-        $company = Company::all();
+        $med = Medicine::all();
         return response()->json([
-            "attributes" => $company,
-            "count" => $company->count()
+            "attributes" => $med,
+            "count" => $med->count()
         ]);
     }
 
@@ -38,7 +35,9 @@ class CompanyController extends Controller
         $validator = Validator::make(
             $request->all(),
             [
-                "name" => "required|min:3|unique:companies",
+                "name" => "required|min:3|unique:medicines",
+                "company" => "required|integer",
+                "type" => "required|integer",
                 "created_by" => "required"
             ]
         );
@@ -52,15 +51,12 @@ class CompanyController extends Controller
         }
 
         //create company record
-        $res = Company::create([
-            "name" => $request->name,
-            "created_by" => $request->created_by,
-        ]);
+        $res = Medicine::create($request->only(["name", "company", "type", "created_by"]));
 
         if ($res) {
             return response()->json([
                 "success" => true,
-                "message" => "Company created successfully.",
+                "message" => "Medicine record created successfully.",
                 "attributes" => $res
             ]);
         } else {
@@ -74,17 +70,21 @@ class CompanyController extends Controller
     /**
      * Display the specified resource.
      *
-     * @param  \App\Models\Company  $company
+     * @param  int  $id
      * @return \Illuminate\Http\Response
      */
-    public function show(Company $company)
+    public function show($id)
     {
-        //
-        // dd($company);
+        $med = Medicine::find($id);
+        if (!$med) {
+            return response()->json([
+                "success" => false,
+                "message" => "Requested data not found."
+            ]);
+        }
         return response()->json([
             "success" => true,
-            "message" => "Success",
-            "attributes" => $company
+            "attributes" => $med->get()
         ]);
     }
 
@@ -92,16 +92,26 @@ class CompanyController extends Controller
      * Update the specified resource in storage.
      *
      * @param  \Illuminate\Http\Request  $request
-     * @param  \App\Models\Company  $company
+     * @param  int  $id
      * @return \Illuminate\Http\Response
      */
-    public function update(Request $request, Company $company)
+    public function update(Request $request, $id)
     {
+        $med = Medicine::find($id);
+        if (!$med) {
+            return response()->json([
+                "success" => false,
+                "message" => "Requested data not found."
+            ]);
+        }
+
         // validate
         $validator = Validator::make(
             $request->all(),
             [
-                "name" => "required|min:3|unique:companies,name," . $company->id . ",id",
+                "name" => "required|min:3|unique:medicines,name," . $id . ",id",
+                "company" => "required|integer",
+                "type" => "required|integer",
                 "created_by" => "required"
             ]
         );
@@ -115,15 +125,12 @@ class CompanyController extends Controller
         }
 
         //create company record
-        $res = $company->update([
-            "name" => $request->name,
-            "created_by" => $request->created_by,
-        ]);
+        $res = $med->update($request->only(["name", "company", "type", "created_by"]));
 
         if ($res) {
             return response()->json([
                 "success" => true,
-                "message" => "Company updated successfully."
+                "message" => "Medicine record updated successfully."
             ]);
         } else {
             return response()->json([
@@ -136,21 +143,35 @@ class CompanyController extends Controller
     /**
      * Remove the specified resource from storage.
      *
-     * @param  \App\Models\Company  $company
+     * @param  int  $id
      * @return \Illuminate\Http\Response
      */
-    public function destroy(Company $company)
+    public function destroy($id)
     {
-        $company->delete();
-        return response()->json([
-            "success" => true,
-            "message" => "Company deleted successfully."
-        ]);
+        $med = Medicine::find($id);
+
+        if ($med && $med->delete()) {
+            return response()->json([
+                "success" => true,
+                "message" => "Data trashed successfully."
+            ]);
+        } else {
+            return response()->json([
+                "success" => false,
+                "message" => "Data not found."
+            ]);
+        }
     }
 
     public function trashed()
     {
-        $trashed = Company::onlyTrashed();
+        $trashed = Medicine::onlyTrashed();
+        if (!$trashed->count() > 0) {
+            return response()->json([
+                "success" => false,
+                "message" => "Trashed items did not found."
+            ]);
+        }
         return response()->json([
             "success" => true,
             "attributes" => $trashed->get(),
@@ -158,19 +179,9 @@ class CompanyController extends Controller
         ]);
     }
 
-    public function withTrashed()
+    public function restore($id)
     {
-        $allData = Company::withTrashed();
-        return response()->json([
-            "success" => true,
-            "attributes" => $allData->get(),
-            "count" => $allData->count()
-        ]);
-    }
-
-    public function restore(Request $request)
-    {
-        $trashed = Company::onlyTrashed()->whereId($request->id);
+        $trashed = Medicine::onlyTrashed()->whereId($id);
         if ($trashed->count() > 0 && $trashed->restore()) {
             return response()->json([
                 "success" => true,
@@ -186,7 +197,7 @@ class CompanyController extends Controller
 
     public function restoreAll()
     {
-        $trashed = Company::onlyTrashed();
+        $trashed = Medicine::onlyTrashed();
 
         if ($trashed->count() > 0 && $trashed->restore()) {
             return response()->json([
@@ -197,24 +208,6 @@ class CompanyController extends Controller
             return response()->json([
                 "success" => false,
                 "message" => "No item found for restore."
-            ]);
-        }
-    }
-
-
-    public function deleteForever(Request $request)
-    {
-        $item = Company::withTrashed()->whereId($request->id);
-        $message = "";
-        if ($item->count() > 0 && $item->forceDelete()) {
-            return response()->json([
-                "success" => true,
-                "message" => "Data deleted forever."
-            ]);
-        } else {
-            return response()->json([
-                "success" => false,
-                "message" => "Requested data did not found."
             ]);
         }
     }
