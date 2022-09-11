@@ -7,6 +7,7 @@ use Illuminate\Http\Request;
 use App\Http\Controllers\Controller;
 use Illuminate\Support\Facades\Validator;
 
+
 use function GuzzleHttp\Promise\all;
 
 class CompanyController extends Controller
@@ -22,16 +23,6 @@ class CompanyController extends Controller
         return response()->json([
             "data" => Company::all()
         ]);
-    }
-
-    /**
-     * Show the form for creating a new resource.
-     *
-     * @return \Illuminate\Http\Response
-     */
-    public function create()
-    {
-        //
     }
 
     /**
@@ -69,7 +60,6 @@ class CompanyController extends Controller
             return response()->json([
                 "success" => true,
                 "message" => "Company created successfully.",
-                "response_code" => 0,
                 "attributes" => $res
             ]);
         } else {
@@ -98,17 +88,6 @@ class CompanyController extends Controller
     }
 
     /**
-     * Show the form for editing the specified resource.
-     *
-     * @param  \App\Models\Company  $company
-     * @return \Illuminate\Http\Response
-     */
-    public function edit(Company $company)
-    {
-        //
-    }
-
-    /**
      * Update the specified resource in storage.
      *
      * @param  \Illuminate\Http\Request  $request
@@ -117,7 +96,6 @@ class CompanyController extends Controller
      */
     public function update(Request $request, Company $company)
     {
-        //
         // validate
         $validator = Validator::make(
             $request->all(),
@@ -171,49 +149,69 @@ class CompanyController extends Controller
 
     public function trashed()
     {
-        $res = Company::onlyTrashed()->get();
         return response()->json([
-            "status" => true,
-            "trashed" => $res
+            "success" => true,
+            "attributes" => Company::onlyTrashed()->get()
         ]);
     }
 
     public function withTrashed()
     {
-        // $com = new Company();
-        // if ($com->withTrashed()) {
-        //     return response()->json(["message" => "found deleted data."]);
-        // }
         $res = Company::withTrashed()->get();
         return response()->json([
-            "status" => true,
+            "success" => true,
             "trashed" => $res
         ]);
     }
 
     public function restore(Request $request)
     {
-        $res = Company::withTrashed()
-            ->whereId($request->id)
-            ->restore();
-        return response()->json([
-            "status" => true,
-            "trashed" => $res
-        ]);
+        $trashed = Company::onlyTrashed()->whereId($request->id);
+        if ($trashed->count() > 0 && $trashed->restore()) {
+            return response()->json([
+                "success" => true,
+                "message" => "Data restored successfully."
+            ]);
+        } else {
+            return response()->json([
+                "success" => false,
+                "message" => "Requested trashed item did not found."
+            ]);
+        }
     }
 
     public function restoreAll()
     {
-        $res = Company::withTrashed();
+        $trashed = Company::onlyTrashed();
 
-        $r = $res->restore();
-        return response()->json([
-            "status" => true,
-            "response" => $r
-        ]);
+        if ($trashed->count() > 0 && $trashed->restore()) {
+            return response()->json([
+                "success" => true,
+                "message" => "All items restored successfully."
+            ]);
+        } else {
+            return response()->json([
+                "success" => false,
+                "message" => "No item found for restore."
+            ]);
+        }
     }
+
 
     public function deleteForever(Request $request)
     {
+        $item = Company::withTrashed()->whereId($request->id);
+        $message = "";
+        if ($item->count() > 0 && $item->forceDelete()) {
+            return response()->json([
+                "success" => true,
+                "message" => "Data deleted forever."
+            ]);
+        } else {
+            return response()->json([
+                "success" => false,
+                "message" => "Requested data did not found."
+            ]);
+        }
     }
 }

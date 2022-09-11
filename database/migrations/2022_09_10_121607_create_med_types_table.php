@@ -18,6 +18,7 @@ return new class extends Migration
             $table->String("name");
             $table->String("created_by");
             $table->timestamps();
+            $table->softDeletes();
         });
     }
 
