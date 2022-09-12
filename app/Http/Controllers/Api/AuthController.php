@@ -2,15 +2,14 @@
 
 namespace App\Http\Controllers\Api;
 
-use App\Models\Company;
+use App\Models\User;
 use Illuminate\Http\Request;
 use App\Http\Controllers\Controller;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
 
-
-use function GuzzleHttp\Promise\all;
-
-class CompanyController extends Controller
+class AuthController extends Controller
 {
     /**
      * Display a listing of the resource.
@@ -19,17 +18,11 @@ class CompanyController extends Controller
      */
     public function index()
     {
-        $company = Company::all();
-        if (!$company->count() > 0) {
-            return response()->json([
-                "success" => false,
-                "message" => "No record found."
-            ]);
-        }
+        $users = User::all();
         return response()->json([
             "success" => true,
-            "attributes" => $company,
-            "count" => $company->count()
+            "attributes" => $users,
+            "count" => $users->count()
         ]);
     }
 
@@ -45,8 +38,9 @@ class CompanyController extends Controller
         $validator = Validator::make(
             $request->all(),
             [
-                "name" => "required|min:3|unique:companies",
-                "created_by" => "required"
+                "name" => "required|min:3",
+                "email" => "required|email|unique:users",
+                "password" => "required|min:8|max:20|confirmed"
             ]
         );
 
@@ -59,16 +53,19 @@ class CompanyController extends Controller
         }
 
         //create company record
-        $res = Company::create([
+        $user = User::create([
             "name" => $request->name,
-            "created_by" => $request->created_by,
+            "email" => $request->email,
+            "password" => Hash::make($request->password)
         ]);
+        // $user = User::create($request->only(["name", "email", "password"]));
 
-        if ($res) {
+        if ($user) {
             return response()->json([
                 "success" => true,
-                "message" => "Company created successfully.",
-                "attributes" => $res
+                "message" => "User created successfully.",
+                "attributes" => $user,
+                "token" => $user->createToken("API TOKEN")->plainTextToken
             ]);
         } else {
             return response()->json([
@@ -81,15 +78,21 @@ class CompanyController extends Controller
     /**
      * Display the specified resource.
      *
-     * @param  \App\Models\Company  $company
+     * @param  int  $id
      * @return \Illuminate\Http\Response
      */
-    public function show(Company $company)
+    public function show($id)
     {
+        $user = User::find($id);
+        if (!$user) {
+            return response()->json([
+                "success" => false,
+                "message" => "Requested user not found in our database."
+            ]);
+        }
         return response()->json([
             "success" => true,
-            "message" => "Success",
-            "attributes" => $company
+            "attributes" => $user
         ]);
     }
 
@@ -97,17 +100,25 @@ class CompanyController extends Controller
      * Update the specified resource in storage.
      *
      * @param  \Illuminate\Http\Request  $request
-     * @param  \App\Models\Company  $company
+     * @param  int  $id
      * @return \Illuminate\Http\Response
      */
-    public function update(Request $request, Company $company)
+    public function update(Request $request, $id)
     {
+        $user = User::find($id);
+        if (!$user) {
+            return response()->json([
+                "success" => false,
+                "message" => "Requested user not found in our database."
+            ]);
+        }
         // validate
         $validator = Validator::make(
             $request->all(),
             [
-                "name" => "required|min:3|unique:companies,name," . $company->id . ",id",
-                "created_by" => "required"
+                "name" => "required|min:3",
+                "email" => "required|email|unique:users,email," . $id . ",id",
+                "password" => "required|min:8|max:20|confirmed"
             ]
         );
 
@@ -119,21 +130,20 @@ class CompanyController extends Controller
             ]);
         }
 
-        //create company record
-        $res = $company->update([
+        $user->update([
             "name" => $request->name,
-            "created_by" => $request->created_by,
+            "email" => $request->email,
+            "password" => Hash::make($request->password)
         ]);
-
-        if ($res) {
+        if ($user) {
             return response()->json([
                 "success" => true,
-                "message" => "Company updated successfully."
+                "message" => "User data updated successfully."
             ]);
         } else {
             return response()->json([
                 "success" => false,
-                "message" => "Something went wrong."
+                "message" => "User data couldn't updated."
             ]);
         }
     }
@@ -141,21 +151,29 @@ class CompanyController extends Controller
     /**
      * Remove the specified resource from storage.
      *
-     * @param  \App\Models\Company  $company
+     * @param  int  $id
      * @return \Illuminate\Http\Response
      */
-    public function destroy(Company $company)
+    public function destroy($id)
     {
-        $company->delete();
+        $user = User::find($id);
+        if (!$user) {
+            return response()->json([
+                "success" => false,
+                "message" => "Requested user not found in our database."
+            ]);
+        }
+
+        $user->delete();
         return response()->json([
             "success" => true,
-            "message" => "Company deleted successfully."
+            "message" => "User deleted successfully."
         ]);
     }
 
     public function trashed()
     {
-        $trashed = Company::onlyTrashed();
+        $trashed = User::onlyTrashed();
         if (!$trashed->count() > 0) {
             return response()->json([
                 "success" => false,
@@ -169,19 +187,9 @@ class CompanyController extends Controller
         ]);
     }
 
-    public function withTrashed()
+    public function restore($id)
     {
-        $allData = Company::withTrashed();
-        return response()->json([
-            "success" => true,
-            "attributes" => $allData->get(),
-            "count" => $allData->count()
-        ]);
-    }
-
-    public function restore(Request $request)
-    {
-        $trashed = Company::onlyTrashed()->whereId($request->id);
+        $trashed = User::onlyTrashed()->whereId($id);
         if ($trashed->count() > 0 && $trashed->restore()) {
             return response()->json([
                 "success" => true,
@@ -197,7 +205,7 @@ class CompanyController extends Controller
 
     public function restoreAll()
     {
-        $trashed = Company::onlyTrashed();
+        $trashed = User::onlyTrashed();
 
         if ($trashed->count() > 0 && $trashed->restore()) {
             return response()->json([
@@ -212,20 +220,40 @@ class CompanyController extends Controller
         }
     }
 
-
-    public function deleteForever(Request $request)
+    public function login(Request $request)
     {
-        $company = Company::withTrashed()->whereId($request->id);
-        $message = "";
-        if ($company->count() > 0 && $company->forceDelete()) {
+        try {
+            $validator = Validator::make(
+                $request->all(),
+                [
+                    "email" => "required|email",
+                    "password" => 'required'
+                ]
+            );
+
+            if ($validator->fails()) {
+                return response()->json([
+                    "status" => false,
+                    "message" => $validator->errors(),
+                ]);
+            }
+
+            if (!Auth::attempt($request->only(['email', 'password']))) {
+                return response()->json([
+                    "status" => false,
+                    "message" => "User login failed.",
+                ]);
+            }
+            $user = User::where("email", $request->email)->first();
             return response()->json([
-                "success" => true,
-                "message" => "Data deleted forever."
+                "status" => true,
+                "message" => "User logged in successfully.",
+                "token" => $user->createToken("API TOKEN")->plainTextToken
             ]);
-        } else {
+        } catch (\Throwable $th) {
             return response()->json([
-                "success" => false,
-                "message" => "Requested data did not found."
+                "status" => false,
+                "message" => $th->getMessage()
             ]);
         }
     }

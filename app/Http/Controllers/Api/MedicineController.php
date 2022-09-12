@@ -18,6 +18,7 @@ class MedicineController extends Controller
     {
         $med = Medicine::all();
         return response()->json([
+            "success" => true,
             "attributes" => $med,
             "count" => $med->count()
         ]);
@@ -169,7 +170,7 @@ class MedicineController extends Controller
         if (!$trashed->count() > 0) {
             return response()->json([
                 "success" => false,
-                "message" => "Trashed items did not found."
+                "message" => "Trashed records did not found."
             ]);
         }
         return response()->json([
@@ -190,7 +191,7 @@ class MedicineController extends Controller
         } else {
             return response()->json([
                 "success" => false,
-                "message" => "Requested trashed item did not found."
+                "message" => "Requested trashed record did not found."
             ]);
         }
     }
@@ -202,12 +203,12 @@ class MedicineController extends Controller
         if ($trashed->count() > 0 && $trashed->restore()) {
             return response()->json([
                 "success" => true,
-                "message" => "All items restored successfully."
+                "message" => "All records restored successfully."
             ]);
         } else {
             return response()->json([
                 "success" => false,
-                "message" => "No item found for restore."
+                "message" => "No record found for restore."
             ]);
         }
     }

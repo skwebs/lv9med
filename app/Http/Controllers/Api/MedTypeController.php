@@ -165,7 +165,12 @@ class MedTypeController extends Controller
     public function trashed()
     {
         $trashed = MedType::onlyTrashed();
-
+        if (!$trashed->count() > 0) {
+            return response()->json([
+                "success" => false,
+                "message" => "Trashed records did not found."
+            ]);
+        }
         return response()->json([
             "success" => true,
             "attributes" => $trashed->get(),
@@ -205,12 +210,12 @@ class MedTypeController extends Controller
         if ($trashed->count() > 0 && $trashed->restore()) {
             return response()->json([
                 "success" => true,
-                "message" => "All trashed items restored successfully."
+                "message" => "All trashed records restored successfully."
             ]);
         } else {
             return response()->json([
                 "success" => false,
-                "message" => "No item found for restore."
+                "message" => "No record found for restore."
             ]);
         }
     }
